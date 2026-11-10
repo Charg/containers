@@ -24,6 +24,10 @@ jobs:
 
       - name: Install nix
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          # Plain upstream Nix: nothing here uses FlakeHub, and its login needs id-token: write,
+          # which only the signing job should hold.
+          determinate: false
 
       - name: Lint
         run: nix develop -c just lint
@@ -42,6 +46,10 @@ jobs:
 
       - name: Install nix
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          # Plain upstream Nix: nothing here uses FlakeHub, and its login needs id-token: write,
+          # which only the signing job should hold.
+          determinate: false
 
       - name: List changed images
         id: changed
@@ -66,6 +74,10 @@ jobs:
 
       - name: Install nix
         uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          # Plain upstream Nix: nothing here uses FlakeHub, and its login needs id-token: write,
+          # which only the signing job should hold.
+          determinate: false
 
       - name: Expose the Actions cache to buildx
         uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0

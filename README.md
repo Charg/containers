@@ -65,6 +65,6 @@ anonymously.
 Renovate bumps upstream versions (e.g. `ANKI_VERSION` from the ankitects/anki releases), base
 image digests, GitHub Actions and the flake lock, and auto-merges once CI passes.
 
-GHCR creates a new package as private, with no API to change that. The first time a new image is
-published, the release job fails its public-pull check until an admin sets the package to
-public once in its GitHub settings. Later pushes keep that visibility.
+Every image must be public. New packages have come out public with no manual step, apparently
+because each image's source annotation links it to this public repo. The release job still checks
+each publish with an anonymous pull and fails if it's denied.

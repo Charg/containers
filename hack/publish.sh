@@ -86,8 +86,9 @@ if [ -n "${token}" ]; then
 fi
 if [ "${status}" != 200 ]; then
   echo "::error::${REF} is not publicly pullable (anonymous pull got HTTP ${status:-none})." \
-    "GHCR creates new packages as private: an admin must set it to public once at" \
-    "the package's settings page (Package settings > Change visibility), found under" \
+    "Every image here must be public. Check that the image's org.opencontainers.image.source" \
+    "annotation names this repo, and set the package to public in its settings" \
+    "(Package settings > Change visibility), found under" \
     "https://github.com/${GITHUB_REPOSITORY_OWNER}?tab=packages" >&2
   exit 1
 fi
