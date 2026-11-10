@@ -1,0 +1,29 @@
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local scratch / secrets
+.scratch/
+.env
+.env.*
+
+# cosign / sigstore local artifacts
+*.sig
+*.pem
+cosign.key
+
+# nix
+result
+result-*
+.direnv/
+
+# Personal Claude Code state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
+.claude/memory/
+.claude/plans/
+CLAUDE.local.md

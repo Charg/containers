@@ -1,0 +1,91 @@
+# syntax=docker/dockerfile:1
+#
+# Anki's self-hosted sync server. Adapted from upstream's docs/syncserver/Dockerfile.distroless:
+# same cargo install and runtime layout, but cross-compiled on the build host (no QEMU), run as
+# distroless' nonroot user, and with both base images pinned by digest.
+
+# The published tag is this version. Renovate bumps it from the ankitects/anki GitHub releases.
+# renovate: datasource=github-releases depName=ankitects/anki
+ARG ANKI_VERSION=26.09.4
+
+# Builder runs natively on the build host and cross-compiles for the target platform; compiling
+# Anki under QEMU emulation takes over an hour. Keep the Rust release in step with the
+# rust-toolchain.toml of the Anki tag being built.
+FROM --platform=$BUILDPLATFORM rust:1.97.1-trixie@sha256:b1b3c9c0d921d7fa0a6d1f9ec7e4eab87f8c8ec97644c3d791450f131dec813f AS builder
+
+ARG ANKI_VERSION
+ARG TARGETARCH
+ARG BUILDARCH
+
+RUN <<EOF
+set -eu
+case "${TARGETARCH}" in
+  amd64) echo x86_64-unknown-linux-gnu >/rust-target; gnu=x86_64-linux-gnu; pkg=x86-64-linux-gnu; libc=amd64 ;;
+  arm64) echo aarch64-unknown-linux-gnu >/rust-target; gnu=aarch64-linux-gnu; pkg=aarch64-linux-gnu; libc=arm64 ;;
+  *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;;
+esac
+packages="protobuf-compiler"
+if [ "${TARGETARCH}" != "${BUILDARCH}" ]; then
+  packages="${packages} gcc-${pkg} g++-${pkg} libc6-dev-${libc}-cross"
+  # Tell cargo and the cc crate (bundled sqlite, zstd, ...) which cross toolchain to use.
+  target_env="$(tr 'a-z-' 'A-Z_' </rust-target)"
+  target_cc="$(tr '-' '_' </rust-target)"
+  {
+    echo "export CARGO_TARGET_${target_env}_LINKER=${gnu}-gcc"
+    echo "export CC_${target_cc}=${gnu}-gcc"
+    echo "export CXX_${target_cc}=${gnu}-g++"
+    echo "export AR_${target_cc}=${gnu}-ar"
+  } >/cross-env
+else
+  : >/cross-env
+fi
+apt-get update
+# shellcheck disable=SC2086 # word splitting of the package list is intended
+apt-get install -y --no-install-recommends ${packages}
+rm -rf /var/lib/apt/lists/*
+rustup target add "$(cat /rust-target)"
+EOF
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/cargo-target,id=anki-sync-server-target-${TARGETARCH} <<EOF
+set -eu
+. /cross-env
+CARGO_TARGET_DIR=/cargo-target CARGO_PROFILE_RELEASE_STRIP=true \
+  cargo install --git https://github.com/ankitects/anki.git \
+    --tag "${ANKI_VERSION}" \
+    --target "$(cat /rust-target)" \
+    --root /anki-server \
+    --locked \
+    anki-sync-server
+# Data directory, owned by distroless' nonroot user so the server can write to it.
+mkdir -p /rootfs/anki_data
+EOF
+
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:cc66d222f0a7ec996b78a99fe76a969bc80b539a5016ad866c14d1949bc6d0ab
+
+ARG ANKI_VERSION
+
+COPY --from=builder /anki-server/bin/anki-sync-server /usr/bin/anki-sync-server
+COPY --from=builder --chown=65532:65532 /rootfs/anki_data /anki_data
+
+# Users set SYNC_USER1=user:pass (SYNC_USER2, ...); the port and data path are fixed so the
+# healthcheck and volume stay correct.
+ENV SYNC_PORT=8080 \
+    SYNC_BASE=/anki_data
+
+USER 65532:65532
+EXPOSE 8080
+VOLUME /anki_data
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD ["anki-sync-server", "--healthcheck"]
+
+CMD ["anki-sync-server"]
+
+LABEL org.opencontainers.image.title="anki-sync-server" \
+      org.opencontainers.image.description="Anki's self-hosted sync server, built from upstream source on distroless." \
+      org.opencontainers.image.version="${ANKI_VERSION}" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later" \
+      org.opencontainers.image.url="https://github.com/ankitects/anki" \
+      org.opencontainers.image.source="https://github.com/Charg/containers"

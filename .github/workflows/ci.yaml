@@ -1,0 +1,100 @@
+---
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Lint
+        run: nix develop -c just lint
+
+  changed:
+    name: changed images
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.changed.outputs.images }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Diffing against the base branch needs its history.
+          fetch-depth: 0
+
+      - name: Install nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: List changed images
+        id: changed
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
+        run: nix develop -c just changed "origin/${BASE_REF}"
+
+  check:
+    name: check ${{ matrix.image }}
+    needs: changed
+    if: needs.changed.outputs.images != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changed.outputs.images) }}
+    env:
+      CACHE: gha
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+
+      - name: Expose the Actions cache to buildx
+        uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+
+      - name: Build, test and scan
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: nix develop -c just check "${IMAGE}"
+
+      - name: Build every platform
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: nix develop -c just build-all "${IMAGE}"
+
+  # Single required status for the branch ruleset: passes when every image check passed or
+  # there was nothing to check.
+  ci:
+    name: ci
+    if: always()
+    needs: [lint, changed, check]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to succeed or be skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in ${RESULTS}; do
+            case "${result}" in
+              success | skipped) ;;
+              *) echo "a required job ended with: ${result}" >&2; exit 1 ;;
+            esac
+          done

@@ -1,0 +1,5 @@
+---
+ignored:
+  # Debian package versions aren't pinned: the builder base image is pinned by digest, which
+  # pins its apt snapshot closely enough, and only build-stage tools are installed.
+  - DL3008

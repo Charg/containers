@@ -1,0 +1,78 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    ":semanticCommits",
+    "docker:pinDigests",
+  ],
+
+  semanticCommitType: "chore",
+  labels: ["dependencies"],
+  configMigration: true,
+
+  // Merge without review once CI is green (main's ruleset requires the `ci` check). Let each
+  // upstream release age a few days first: upstream yanks or re-tags a bad release in that
+  // window instead of it reaching ghcr.
+  automerge: true,
+  automergeType: "pr",
+  platformAutomerge: true,
+  minimumReleaseAge: "3 days",
+
+  nix: {
+    enabled: true,
+  },
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: ["before 6am on monday"],
+  },
+
+  packageRules: [
+    {
+      // GitHub Actions are SHA-pinned with a version comment; keep that pinning on update.
+      matchManagers: ["github-actions"],
+      pinDigests: true,
+      groupName: "github actions",
+    },
+    {
+      // Base-image digest bumps are how CVE fixes arrive. Merge them as soon as CI passes.
+      matchManagers: ["dockerfile"],
+      matchUpdateTypes: ["digest", "pinDigest"],
+      minimumReleaseAge: null,
+    },
+    {
+      // Builder toolchains move in step with the upstream source (rust-toolchain.toml), not on
+      // their own schedule; a Rust bump waits for a human.
+      matchManagers: ["dockerfile"],
+      matchDepNames: ["rust"],
+      matchUpdateTypes: ["major", "minor"],
+      automerge: false,
+    },
+    {
+      // Anki versions are YY.MM[.patch]; follow only final releases, never betas or rcs.
+      matchDepNames: ["ankitects/anki"],
+      versioning: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)(\\.(?<patch>\\d+))?$",
+      commitMessageTopic: "Anki",
+      // Each Anki release is the payload; a scoped commit keeps it findable in history.
+      semanticCommitType: "feat",
+      semanticCommitScope: "anki-sync-server",
+    },
+    {
+      // Majors still wait for a human.
+      matchUpdateTypes: ["major"],
+      automerge: false,
+    },
+  ],
+
+  // Upstream versions pinned in Dockerfile ARGs, marked with a comment on the line above:
+  //   # renovate: datasource=github-releases depName=ankitects/anki
+  //   ARG ANKI_VERSION=26.09.4
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^images/[^/]+/Dockerfile$/"],
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+ARG [A-Z0-9_]+=(?<currentValue>\\S+)",
+      ],
+    },
+  ],
+}
