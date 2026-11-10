@@ -3,7 +3,7 @@
 # push can touch several images at once, and a re-run after a partial failure must reach the
 # same answer without knowing what the last run did.
 #
-# An image needs publishing when ghcr.io/<owner>/<name>:<version> doesn't exist, or when it
+# An image needs publishing when ghcr.io/<owner>/containers/<name>:<version> doesn't exist, or when it
 # exists but was built from different inputs (its index annotation doesn't match the hash of
 # images/<name>/). The second case is how base-image digest bumps (CVE fixes) get republished
 # under the same upstream version tag.
@@ -25,7 +25,7 @@ while IFS= read -r name; do
   [ -n "${name}" ] || continue
   version="$(image_version "${name}")"
   inputs="$(image_inputs "${name}")"
-  repo="${OWNER}/${name}"
+  repo="$(image_repo "${name}")"
 
   token="$(ghcr_token "${repo}")" || {
     echo "registry auth failed for ${repo}; aborting (fail closed)" >&2

@@ -99,8 +99,14 @@ image_build_tag() {
   printf '%s-%s\n' "${version}" "${inputs:0:12}"
 }
 
+# Repository path of an image under ghcr.io. Images live under containers/ so they never collide
+# with a Helm chart of the same name, which Charg/charts publishes under charts/.
+image_repo() {
+  printf '%s/containers/%s\n' "${OWNER}" "${1}"
+}
+
 image_ref() {
-  printf 'ghcr.io/%s/%s\n' "${OWNER}" "${1}"
+  printf 'ghcr.io/%s\n' "$(image_repo "${1}")"
 }
 
 # Local tag `just build` loads into the docker daemon, and `just test` / `just scan` use.

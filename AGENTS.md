@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Container images published to `ghcr.io/charg/<name>`, signed keylessly with cosign. Sibling of
+Container images published to `ghcr.io/charg/containers/<name>`, signed keylessly with cosign. Sibling of
 the `Charg/charts` repo (Helm charts); this repo holds only images and shares its conventions.
 
 ## Ground rules
@@ -49,7 +49,7 @@ just publish <name>      # CI only: push, sign, verify, check public
 
 ## How publishing works
 
-`plan.sh` publishes an image when `ghcr.io/charg/<name>:<version>` is missing, or when the
+`plan.sh` publishes an image when `ghcr.io/charg/containers/<name>:<version>` is missing, or when the
 `dev.charg.containers.inputs` index annotation on it doesn't match `image_inputs` (a hash of
 `images/<name>/` except `test.sh`). That's how base-image digest bumps (CVE fixes, via Renovate)
 republish under the same tag. Editing anything in an image directory other than `test.sh`
@@ -76,6 +76,8 @@ don't rely on QEMU, it's far too slow for source builds.
 
 ## Gotchas
 
+- Images publish under `containers/` and charts (Charg/charts) under `charts/`, so an image and a
+  chart can share a name. Never publish to `ghcr.io/charg/<name>` directly.
 - GHCR rejects uppercase path segments; the owner `Charg` is lowercased to `charg` in scripts.
 - **Every published image must be public.** New packages have come out public with no manual
   step, apparently because the `org.opencontainers.image.source` annotation links them to this

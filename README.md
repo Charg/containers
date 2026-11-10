@@ -1,6 +1,6 @@
 # containers
 
-Container images published to GitHub Packages at `ghcr.io/charg/<name>`, built for
+Container images published to GitHub Packages at `ghcr.io/charg/containers/<name>`, built for
 `linux/amd64` and `linux/arm64`, signed keylessly with cosign, with SBOM and build provenance
 attached. Companion to [Charg/charts](https://github.com/Charg/charts).
 
@@ -12,7 +12,7 @@ attached. Companion to [Charg/charts](https://github.com/Charg/charts).
 
 ```bash
 docker run -d -p 8080:8080 -e SYNC_USER1=user:pass \
-  -v anki-data:/anki_data ghcr.io/charg/anki-sync-server:26.09.4
+  -v anki-data:/anki_data ghcr.io/charg/containers/anki-sync-server:26.09.4
 ```
 
 Each image is published under two tags:
@@ -22,7 +22,7 @@ Each image is published under two tags:
 - `26.09.4-<hash>`: the version plus the first 12 hex digits of a hash of the image's inputs
   (`images/<name>/`). It **never moves**; the release job refuses to overwrite it.
 
-For deployments, pin by digest (`ghcr.io/charg/anki-sync-server@sha256:...`), or use the immutable
+For deployments, pin by digest (`ghcr.io/charg/containers/anki-sync-server@sha256:...`), or use the immutable
 tag and check that it resolves to a signed digest.
 
 ### Verifying an image
@@ -30,7 +30,7 @@ tag and check that it resolves to a signed digest.
 Every image index is signed keylessly by the release workflow on `main`:
 
 ```bash
-cosign verify ghcr.io/charg/anki-sync-server:26.09.4 \
+cosign verify ghcr.io/charg/containers/anki-sync-server:26.09.4 \
   --certificate-identity https://github.com/Charg/containers/.github/workflows/release.yaml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
@@ -38,18 +38,18 @@ cosign verify ghcr.io/charg/anki-sync-server:26.09.4 \
 Build provenance (SLSA, from GitHub's attestation service):
 
 ```bash
-gh attestation verify oci://ghcr.io/charg/anki-sync-server:26.09.4 --repo Charg/containers
+gh attestation verify oci://ghcr.io/charg/containers/anki-sync-server:26.09.4 --repo Charg/containers
 ```
 
 Each platform image also carries a signed Trivy vulnerability report (cosign `vuln` attestation)
 recorded at publish time. These are attached to the per-platform digests, which
-`docker buildx imagetools inspect ghcr.io/charg/anki-sync-server:26.09.4` lists:
+`docker buildx imagetools inspect ghcr.io/charg/containers/anki-sync-server:26.09.4` lists:
 
 ```bash
 cosign verify-attestation --type vuln \
   --certificate-identity https://github.com/Charg/containers/.github/workflows/release.yaml@refs/heads/main \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/charg/anki-sync-server@sha256:<platform digest> | jq -r .payload | base64 -d | jq .predicate
+  ghcr.io/charg/containers/anki-sync-server@sha256:<platform digest> | jq -r .payload | base64 -d | jq .predicate
 ```
 
 ## Local development

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds one image for every platform, pushes it to ghcr.io/<owner>/<name>:<version> and to the
+# Builds one image for every platform, pushes it to ghcr.io/<owner>/containers/<name>:<version> and to the
 # immutable tag <version>-<inputs>, signs it keylessly with cosign, verifies the signature, attaches
 # a signed Trivy vulnerability attestation to each platform image and checks the package is
 # publicly pullable.
@@ -42,18 +42,18 @@ ISSUER="https://token.actions.githubusercontent.com"
 # Prints the digest ghcr.io/<owner>/<name>:${1} resolves to, or fails.
 resolve_digest() {
   local token status
-  token="$(ghcr_token "${OWNER}/${NAME}")" || return 1
-  status="$(ghcr_manifest "${OWNER}/${NAME}" "${1}" "${token}" "${body}")" || return 1
+  token="$(ghcr_token "$(image_repo "${NAME}")")" || return 1
+  status="$(ghcr_manifest "$(image_repo "${NAME}")" "${1}" "${token}" "${body}")" || return 1
   [ "${status}" = 200 ] || return 1
   printf 'sha256:%s\n' "$(sha256sum <"${body}" | cut -c1-64)"
 }
 
 # Has this exact set of inputs been published before? Only a definitive answer will do.
-token="$(ghcr_token "${OWNER}/${NAME}")" || {
+token="$(ghcr_token "$(image_repo "${NAME}")")" || {
   echo "registry auth failed for ${REF}; aborting (fail closed)" >&2
   exit 1
 }
-existing="$(ghcr_manifest "${OWNER}/${NAME}" "${BUILD_TAG}" "${token}" "${body}")" || {
+existing="$(ghcr_manifest "$(image_repo "${NAME}")" "${BUILD_TAG}" "${token}" "${body}")" || {
   echo "registry unreachable checking ${REF}:${BUILD_TAG}; aborting (fail closed)" >&2
   exit 1
 }
@@ -158,10 +158,10 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
 fi
 
 echo "==> checking ${REF} is publicly pullable"
-token="$(ghcr_token "${OWNER}/${NAME}" anonymous)" || token=""
+token="$(ghcr_token "$(image_repo "${NAME}")" anonymous)" || token=""
 status=""
 if [ -n "${token}" ]; then
-  status="$(ghcr_manifest "${OWNER}/${NAME}" "${DIGEST}" "${token}" "${body}")" || status=""
+  status="$(ghcr_manifest "$(image_repo "${NAME}")" "${DIGEST}" "${token}" "${body}")" || status=""
 fi
 if [ "${status}" != 200 ]; then
   echo "::error::${REF} is not publicly pullable (anonymous pull got HTTP ${status:-none})." \
