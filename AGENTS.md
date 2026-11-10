@@ -21,15 +21,17 @@ the `Charg/charts` repo (Helm charts); this repo holds only images and shares it
 ## Layout
 
 ```
-images/<name>/Dockerfile   upstream version in the first `ARG <NAME>_VERSION=` before FROM; base images pinned by digest
+images/<name>/Dockerfile   upstream version in the first `ARG <NAME>_VERSION=` before FROM, its commit in
+                           `ARG <NAME>_COMMIT=` right after; base images and `# syntax=` pinned by digest
 images/<name>/test.sh      smoke test: `test.sh <image>`, runs it and asserts it serves; exit non-zero on failure
 hack/                      the scripts behind every recipe; tools.sh holds the shared helpers
 .github/workflows/         ci.yaml (PRs: lint, check and cross-build changed images), release.yaml (main: plan, publish)
 .github/renovate.json5     bumps upstream version ARGs, base-image digests, actions, flake.lock
 ```
 
-The image name is the directory name. The published tag is the upstream version
-(`anki-sync-server:26.09.4`), never a repo-level SemVer.
+The image name is the directory name. The published tags are the upstream version
+(`anki-sync-server:26.09.4`, moves on rebuilds) and `<version>-<first 12 of image_inputs>`
+(immutable, never overwritten), never a repo-level SemVer.
 
 ## Recipes
 
@@ -51,7 +53,12 @@ just publish <name>      # CI only: push, sign, verify, check public
 `dev.charg.containers.inputs` index annotation on it doesn't match `image_inputs` (a hash of
 `images/<name>/` except `test.sh`). That's how base-image digest bumps (CVE fixes, via Renovate)
 republish under the same tag. Editing anything in an image directory other than `test.sh`
-republishes it on merge.
+republishes it on merge. `publish.sh` pushes both tags, signs the index, and attaches a signed
+Trivy `vuln` attestation to each platform digest. If the immutable tag already exists, it re-points
+the version tag at that (verified-signed) image instead of rebuilding.
+
+No mutable references in a build: fetch upstream source by commit, not tag, and fail the build
+if the tag no longer points at that commit.
 
 Builders compile natively on the build host and cross-compile for the target (`--platform=$BUILDPLATFORM`);
 don't rely on QEMU, it's far too slow for source builds.
@@ -60,8 +67,9 @@ don't rely on QEMU, it's far too slow for source builds.
 
 1. Create `images/<name>/` with a `Dockerfile` (prefer upstream's own) and an executable
    `test.sh`. Run as non-root; set OCI labels including `org.opencontainers.image.description`.
-2. Put `# renovate: datasource=... depName=...` on the line above the version ARG; the
-   generic regex manager in `.github/renovate.json5` picks it up. Add a `packageRules` entry
+2. Put `# renovate: datasource=... depName=...` on the line above the version ARG, and the
+   `<NAME>_COMMIT` ARG on the line after it; the generic regex manager in
+   `.github/renovate.json5` bumps both. Add a `packageRules` entry
    if the upstream's versioning needs it.
 3. Add a row to the image table in `README.md`.
 4. `just lint && just check <name> && just build-all <name>` must pass.

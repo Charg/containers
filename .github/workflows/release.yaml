@@ -79,10 +79,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: nix develop -c hack/registry-login.sh
 
-      - name: Build, push, sign and verify
+      - name: Build, push, sign, verify and attest vulnerabilities
         id: publish
         env:
           IMAGE: ${{ matrix.image }}
+          # Read access to check the immutable tag; an anonymous query can't tell 404 from 403.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: nix develop -c just publish "${IMAGE}"
 
       - name: Attest build provenance
