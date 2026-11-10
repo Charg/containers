@@ -1,12 +1,15 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 #
 # Anki's self-hosted sync server. Adapted from upstream's docs/syncserver/Dockerfile.distroless:
 # same cargo install and runtime layout, but cross-compiled on the build host (no QEMU), run as
 # distroless' nonroot user, and with both base images pinned by digest.
 
-# The published tag is this version. Renovate bumps it from the ankitects/anki GitHub releases.
+# The published tag is this version. Renovate bumps it from the ankitects/anki GitHub releases,
+# together with the commit the release tag points at. The source is fetched by that commit, not
+# by the tag, because upstream can move a tag; the build fails if the tag no longer matches.
 # renovate: datasource=github-releases depName=ankitects/anki
 ARG ANKI_VERSION=26.09.4
+ARG ANKI_COMMIT=c06370ff4d87cb48d825f90cc83e02b9a4e84ecd
 
 # Builder runs natively on the build host and cross-compiles for the target platform; compiling
 # Anki under QEMU emulation takes over an hour. Keep the Rust release in step with the
@@ -14,6 +17,7 @@ ARG ANKI_VERSION=26.09.4
 FROM --platform=$BUILDPLATFORM rust:1.97.1-trixie@sha256:b1b3c9c0d921d7fa0a6d1f9ec7e4eab87f8c8ec97644c3d791450f131dec813f AS builder
 
 ARG ANKI_VERSION
+ARG ANKI_COMMIT
 ARG TARGETARCH
 ARG BUILDARCH
 
@@ -50,10 +54,19 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=/cargo-target,id=anki-sync-server-target-${TARGETARCH} <<EOF
 set -eu
+# Upstream can move a tag; the commit is what gets built. Refuse if they no longer agree. For an
+# annotated tag, the peeled ^{} line is the commit.
+git ls-remote https://github.com/ankitects/anki.git \
+  "refs/tags/${ANKI_VERSION}" "refs/tags/${ANKI_VERSION}^{}" >/tmp/anki-tag
+tagged="$(awk 'NR == 1 || /\^\{\}$/ { c = $1 } END { print c }' /tmp/anki-tag)"
+if [ "${tagged}" != "${ANKI_COMMIT}" ]; then
+  echo "anki tag ${ANKI_VERSION} points at '${tagged}', expected ${ANKI_COMMIT}; refusing to build" >&2
+  exit 1
+fi
 . /cross-env
 CARGO_TARGET_DIR=/cargo-target CARGO_PROFILE_RELEASE_STRIP=true \
   cargo install --git https://github.com/ankitects/anki.git \
-    --tag "${ANKI_VERSION}" \
+    --rev "${ANKI_COMMIT}" \
     --target "$(cat /rust-target)" \
     --root /anki-server \
     --locked \

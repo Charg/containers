@@ -90,6 +90,15 @@ image_inputs() {
   ) | sha256sum | cut -c1-64
 }
 
+# Immutable tag for an image: its upstream version plus a short hash of its inputs, e.g.
+# 26.09.4-1a2b3c4d5e6f. Unlike the version tag it never moves; publish.sh never overwrites it.
+image_build_tag() {
+  local version inputs
+  version="$(image_version "${1}")"
+  inputs="$(image_inputs "${1}")"
+  printf '%s-%s\n' "${version}" "${inputs:0:12}"
+}
+
 image_ref() {
   printf 'ghcr.io/%s/%s\n' "${OWNER}" "${1}"
 }
