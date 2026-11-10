@@ -1,6 +1,6 @@
 # containers
 
-Container images published to GitHub Packages at `ghcr.io/charg/<name>`, built for
+Container images published to GitHub Packages at `ghcr.io/charg/containers/<name>`, built for
 `linux/amd64` and `linux/arm64`, signed keylessly with cosign, with SBOM and build provenance
 attached. Companion to [Charg/charts](https://github.com/Charg/charts).
 
@@ -12,7 +12,7 @@ attached. Companion to [Charg/charts](https://github.com/Charg/charts).
 
 ```bash
 docker run -d -p 8080:8080 -e SYNC_USER1=user:pass \
-  -v anki-data:/anki_data ghcr.io/charg/anki-sync-server:26.09.4
+  -v anki-data:/anki_data ghcr.io/charg/containers/anki-sync-server:26.09.4
 ```
 
 Tags follow the upstream version. A tag is rebuilt in place when its base image picks up
@@ -21,7 +21,7 @@ security fixes, so pin by digest if you need byte-for-byte reproducibility.
 Verify a signature:
 
 ```bash
-cosign verify ghcr.io/charg/anki-sync-server:26.09.4 \
+cosign verify ghcr.io/charg/containers/anki-sync-server:26.09.4 \
   --certificate-identity-regexp '^https://github.com/Charg/containers/\.github/workflows/release\.yaml@' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```

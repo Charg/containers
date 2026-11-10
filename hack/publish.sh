@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds one image for every platform, pushes it to ghcr.io/<owner>/<name>:<version>, signs it
+# Builds one image for every platform, pushes it to ghcr.io/<owner>/containers/<name>:<version>, signs it
 # keylessly with cosign, verifies the signature and checks the package is publicly pullable.
 #
 # Assumes the caller has logged in to ghcr.io (hack/registry-login.sh) and is running in GitHub
@@ -79,10 +79,10 @@ fi
 echo "==> checking ${REF} is publicly pullable"
 body="$(mktemp)"
 trap 'rm -f "${metadata}" "${body}"' EXIT
-token="$(ghcr_token "${OWNER}/${NAME}" anonymous)" || token=""
+token="$(ghcr_token "$(image_repo "${NAME}")" anonymous)" || token=""
 status=""
 if [ -n "${token}" ]; then
-  status="$(ghcr_manifest "${OWNER}/${NAME}" "${DIGEST}" "${token}" "${body}")" || status=""
+  status="$(ghcr_manifest "$(image_repo "${NAME}")" "${DIGEST}" "${token}" "${body}")" || status=""
 fi
 if [ "${status}" != 200 ]; then
   echo "::error::${REF} is not publicly pullable (anonymous pull got HTTP ${status:-none})." \
