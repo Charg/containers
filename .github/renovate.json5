@@ -57,21 +57,31 @@
       semanticCommitScope: "anki-sync-server",
     },
     {
+      // A new commit under an unchanged upstream version means upstream moved a release tag.
+      // That is exactly what pinning the commit guards against, so a human looks first.
+      matchManagers: ["custom.regex"],
+      matchUpdateTypes: ["digest"],
+      automerge: false,
+      labels: ["dependencies", "moved-tag"],
+    },
+    {
       // Majors still wait for a human.
       matchUpdateTypes: ["major"],
       automerge: false,
     },
   ],
 
-  // Upstream versions pinned in Dockerfile ARGs, marked with a comment on the line above:
+  // Upstream versions pinned in Dockerfile ARGs, marked with a comment on the line above, with
+  // an optional commit ARG right after that Renovate keeps on the commit the release tag points at:
   //   # renovate: datasource=github-releases depName=ankitects/anki
   //   ARG ANKI_VERSION=26.09.4
+  //   ARG ANKI_COMMIT=c06370ff4d87cb48d825f90cc83e02b9a4e84ecd
   customManagers: [
     {
       customType: "regex",
       managerFilePatterns: ["/^images/[^/]+/Dockerfile$/"],
       matchStrings: [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+ARG [A-Z0-9_]+=(?<currentValue>\\S+)",
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+ARG [A-Z0-9_]+=(?<currentValue>\\S+)(?:\\s+ARG [A-Z0-9_]+_COMMIT=(?<currentDigest>[0-9a-f]{40}))?",
       ],
     },
   ],
