@@ -69,10 +69,10 @@ don't rely on QEMU, it's far too slow for source builds.
 ## Gotchas
 
 - GHCR rejects uppercase path segments; the owner `Charg` is lowercased to `charg` in scripts.
-- **Every published image must be public.** GHCR creates a new package as private and has no API
-  to change that, so the first publish of a new image needs an admin to flip it to public once in
-  the GitHub UI (later pushes inherit it). `publish.sh` checks with an anonymous pull and fails
-  if that pull is denied, so a private package can't go unnoticed.
+- **Every published image must be public.** New packages have come out public with no manual
+  step, apparently because the `org.opencontainers.image.source` annotation links them to this
+  public repo. Keep that annotation. `publish.sh` checks with an anonymous pull and fails if it's
+  denied; if that happens, set the package to public in its GitHub settings.
 - Anonymous `just plan` aborts for an image that has never been published (GHCR answers 403,
   not 404). CI passes `GITHUB_TOKEN` with `packages: read`.
 - This repo is public. No secrets, internal hostnames or private registry references in any file.
