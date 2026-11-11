@@ -57,6 +57,27 @@
       semanticCommitScope: "anki-sync-server",
     },
     {
+      // Vaultwarden releases are the payload, same as Anki's.
+      matchDepNames: ["dani-garcia/vaultwarden"],
+      commitMessageTopic: "Vaultwarden",
+      semanticCommitType: "feat",
+      semanticCommitScope: "vaultwarden",
+    },
+    {
+      // Web vault tags are vYYYY.M.patch; skip "latest", "testing" and the like.
+      matchDepNames: ["docker.io/vaultwarden/web-vault"],
+      versioning: "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+    },
+    {
+      // The image build fails unless the web vault is the digest the Vaultwarden release pins
+      // (docker/DockerSettings.yaml), so a web vault bump can only merge in the same PR as the
+      // server release that adopts it. One group puts them there.
+      matchDepNames: ["dani-garcia/vaultwarden", "docker.io/vaultwarden/web-vault"],
+      groupName: "vaultwarden",
+      semanticCommitType: "feat",
+      semanticCommitScope: "vaultwarden",
+    },
+    {
       // A new commit under an unchanged upstream version means upstream moved a release tag.
       // That is exactly what pinning the commit guards against, so a human looks first.
       matchManagers: ["custom.regex"],
