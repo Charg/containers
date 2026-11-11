@@ -7,6 +7,7 @@ attached. Companion to [Charg/charts](https://github.com/Charg/charts).
 | Image | Description |
 | ----- | ----------- |
 | [anki-sync-server](images/anki-sync-server) | Anki's self-hosted sync server, built from upstream source on distroless. |
+| [vaultwarden](images/vaultwarden) | Vaultwarden (Bitwarden-compatible server), built from upstream source on distroless, SQLite only. |
 
 ## Using an image
 
@@ -98,6 +99,12 @@ Renovate bumps upstream versions with their commits (e.g. `ANKI_VERSION` and `AN
 the ankitects/anki releases), base image digests, GitHub Actions and the flake lock, and
 auto-merges once CI passes. A new commit under an unchanged version means upstream moved a
 release tag; that PR is labelled `moved-tag` and waits for a human.
+
+Vaultwarden's web vault is a separate upstream image that each server release pins by digest
+(`docker/DockerSettings.yaml`). The build fails unless `WEB_VAULT_IMAGE` matches that pin, and
+Renovate groups the two in one `vaultwarden` PR, so a web vault bump only merges together with the
+server release that adopts it. A web vault release that upstream hasn't adopted yet leaves that PR
+red until the next server release updates it.
 
 Every image must be public. New packages have come out public with no manual step, apparently
 because each image's source annotation links it to this public repo. The release job still checks
