@@ -10,10 +10,30 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGES_DIR="${REPO_ROOT}/images"
 
+# BuildKit daemon every build runs in, pinned by digest: it writes the layer tarballs and
+# compresses them, so a different BuildKit can produce different bytes from the same inputs.
+# Renovate bumps it (see .github/renovate.json5).
+# renovate: datasource=docker depName=moby/buildkit
+BUILDKIT_IMAGE="moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe"
+BUILDKIT_VERSION="${BUILDKIT_IMAGE#*:}"
+BUILDKIT_VERSION="${BUILDKIT_VERSION%@*}"
+
 # buildx builder shared by every build. The docker-container driver is what makes multi-platform
-# builds and attestations work; the default docker driver supports neither.
-export BUILDER="${BUILDER:-containers}"
+# builds and attestations work; the default docker driver supports neither. The BuildKit version
+# is in the name, so a bump gets a new builder rather than silently reusing an old one.
+export BUILDER="${BUILDER:-containers-${BUILDKIT_VERSION}}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
+
+# Fixed timestamp for image config, history and (with rewrite-timestamp) every file in the layers
+# a build adds, so rebuilding the same inputs gives the same digests. 1980-01-01, the value nix's
+# dev shell already exported before this was set explicitly; published images keep that date.
+export SOURCE_DATE_EPOCH=315532800
+
+# Version of how images are built from their inputs. It's part of image_inputs, so bumping it
+# republishes every image: do that when a change here or in publish.sh changes the bytes of an
+# image built from unchanged inputs (2: SOURCE_DATE_EPOCH with rewrite-timestamp). BUILDKIT_IMAGE
+# is part of image_inputs too, so a BuildKit bump republishes on its own.
+BUILD_SCHEME=2
 
 # Index annotation that records which inputs a published image was built from (see plan.sh).
 export INPUTS_ANNOTATION="dev.charg.containers.inputs"
@@ -41,11 +61,17 @@ buildx() {
   docker-buildx "$@"
 }
 
-ensure_builder() {
-  if ! buildx inspect "${BUILDER}" >/dev/null 2>&1; then
-    buildx create --name "${BUILDER}" --driver docker-container >/dev/null
+# Creates builder ${1} on the pinned BuildKit image unless it exists, and starts it.
+create_builder() {
+  if ! buildx inspect "${1}" >/dev/null 2>&1; then
+    buildx create --name "${1}" --driver docker-container \
+      --driver-opt "image=${BUILDKIT_IMAGE}" >/dev/null
   fi
-  buildx inspect --bootstrap "${BUILDER}" >/dev/null
+  buildx inspect --bootstrap "${1}" >/dev/null
+}
+
+ensure_builder() {
+  create_builder "${BUILDER}"
 }
 
 # Images present in the repo, one name per line. Empty output is valid: every recipe must succeed
@@ -81,10 +107,12 @@ image_version() {
 }
 
 # Content hash of everything that goes into an image: every file in its directory except the
-# smoke test. Two checkouts with the same hash build the same image, so plan.sh can tell a
-# Dockerfile change or base-image digest bump apart from a no-op.
+# smoke test, plus BUILD_SCHEME and BUILDKIT_IMAGE. Two checkouts with the same hash build the same image, so plan.sh
+# can tell a Dockerfile change or base-image digest bump apart from a no-op.
 image_inputs() {
   (
+    echo "build-scheme ${BUILD_SCHEME}"
+    echo "buildkit ${BUILDKIT_IMAGE}"
     cd "${IMAGES_DIR}/${1}"
     find . -type f ! -name test.sh -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
   ) | sha256sum | cut -c1-64
@@ -135,4 +163,14 @@ ghcr_manifest() {
     -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
     -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
     "https://ghcr.io/v2/${repo}/manifests/${ref}"
+}
+
+# Platform images of the index ${1} (ref@digest), one "<os>/<arch>[/<variant>] <digest>" per line,
+# skipping attestation manifests. Fails if there are none.
+index_platforms() {
+  buildx imagetools inspect --raw "${1}" | jq -er '
+    [.manifests[] | select(.platform.os != "unknown")]
+    | if length == 0 then error("no platform images") else .[] end
+    | "\(.platform.os)/\(.platform.architecture)\(if .platform.variant then "/" + .platform.variant else "" end) \(.digest)"
+  '
 }

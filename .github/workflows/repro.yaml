@@ -1,0 +1,41 @@
+---
+name: repro
+
+# Rebuilds every published image from scratch and checks it comes out byte-identical to what's in
+# the registry. Weekly, and on demand (e.g. after a release). Read-only: it never pushes.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  repro:
+    name: repro
+    # amd64, like the release job: platform images are cross-compiled from the build host.
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install nix
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          # Plain upstream Nix: nothing here uses FlakeHub, and its login needs id-token: write,
+          # which only the signing job should hold.
+          determinate: false
+
+      - name: Rebuild every image and compare digests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: nix develop -c just repro

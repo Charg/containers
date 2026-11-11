@@ -72,10 +72,13 @@ case "${existing}" in
       --annotation "index:org.opencontainers.image.description=${DESCRIPTION}"
       --annotation "index:org.opencontainers.image.version=${VERSION}"
       --annotation "index:${INPUTS_ANNOTATION}=${INPUTS}"
+      --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
       --provenance mode=max
       --sbom true
       --metadata-file "${metadata}"
-      --push
+      # Push, with every file the build adds stamped SOURCE_DATE_EPOCH: what makes the platform
+      # images reproducible (hack/repro.sh).
+      --output "type=registry,rewrite-timestamp=true"
     )
     if [ "${CACHE:-}" = gha ]; then
       args+=(--cache-from "type=gha,scope=${NAME}" --cache-to "type=gha,mode=max,scope=${NAME}")
@@ -128,11 +131,7 @@ esac
 # Attach a signed vulnerability scan to every platform image. This records what was known at
 # publish time; it doesn't gate the publish (CI's `just scan` already did, on the same inputs).
 echo "==> attesting vulnerability scans for ${REF}@${DIGEST}"
-platforms="$(buildx imagetools inspect --raw "${REF}@${DIGEST}" | jq -er '
-  .manifests[]
-  | select(.platform.os != "unknown")
-  | "\(.platform.os)/\(.platform.architecture)\(if .platform.variant then "/" + .platform.variant else "" end) \(.digest)"
-')" || {
+platforms="$(index_platforms "${REF}@${DIGEST}")" || {
   echo "could not list the platform images of ${REF}@${DIGEST}" >&2
   exit 1
 }

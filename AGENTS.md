@@ -45,13 +45,15 @@ just build-all <name>    # cross-build linux/amd64 and linux/arm64, no export
 just changed [base]      # images touched since base (hack/, flake, workflows = all)
 just plan                # which images need publishing (queries GHCR, fails closed)
 just publish <name>      # CI only: push, sign, verify, check public
+just repro [name]        # rebuild published images from scratch, require identical digests (amd64)
 ```
 
 ## How publishing works
 
 `plan.sh` publishes an image when `ghcr.io/charg/containers/<name>:<version>` is missing, or when the
 `dev.charg.containers.inputs` index annotation on it doesn't match `image_inputs` (a hash of
-`images/<name>/` except `test.sh`). That's how base-image digest bumps (CVE fixes, via Renovate)
+`images/<name>/` except `test.sh`, plus `BUILD_SCHEME` and the pinned `BUILDKIT_IMAGE` from
+`hack/tools.sh`). That's how base-image digest bumps (CVE fixes, via Renovate)
 republish under the same tag. Editing anything in an image directory other than `test.sh`
 republishes it on merge. `publish.sh` pushes both tags, signs the index, and attaches a signed
 Trivy `vuln` attestation to each platform digest. If the immutable tag already exists, it re-points
@@ -59,6 +61,15 @@ the version tag at that (verified-signed) image instead of rebuilding.
 
 No mutable references in a build: fetch upstream source by commit, not tag, and fail the build
 if the tag no longer points at that commit.
+
+Builds are reproducible: the same inputs give byte-identical platform images, and the weekly
+`repro` workflow (`just repro`) proves it against the registry. What keeps them that way:
+- BuildKit is pinned by digest in `hack/tools.sh`, and every build uses `SOURCE_DATE_EPOCH` from
+  there with `rewrite-timestamp=true`.
+- Build-stage apt installs use `--snapshot` with the snapshot.debian.org timestamp the builder
+  image records in `/etc/apt/sources.list.d/debian.sources`, never the live archive.
+- Anything that changes the bytes built from unchanged inputs (a new build flag in `publish.sh`)
+  bumps `BUILD_SCHEME`, which republishes every image.
 
 Builders compile natively on the build host and cross-compile for the target (`--platform=$BUILDPLATFORM`);
 don't rely on QEMU, it's far too slow for source builds.

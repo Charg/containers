@@ -43,9 +43,14 @@ if [ "${TARGETARCH}" != "${BUILDARCH}" ]; then
 else
   : >/cross-env
 fi
-apt-get update
+# Install from the Debian snapshot the builder image records it was made from, so a rebuild gets
+# the same compilers and protoc, and they move only when Renovate bumps the builder's digest.
+snapshot="$(sed -n '\|^# http://snapshot.debian.org/archive/debian/[0-9TZ]*$| { s|.*/||p; q }' \
+  /etc/apt/sources.list.d/debian.sources)"
+[ -n "${snapshot}" ] || { echo "builder image records no Debian snapshot" >&2; exit 1; }
+apt-get update --snapshot "${snapshot}"
 # shellcheck disable=SC2086 # word splitting of the package list is intended
-apt-get install -y --no-install-recommends ${packages}
+apt-get install --snapshot "${snapshot}" -y --no-install-recommends ${packages}
 rm -rf /var/lib/apt/lists/*
 rustup target add "$(cat /rust-target)"
 EOF
