@@ -42,6 +42,10 @@ changed base="origin/main":
 plan:
     hack/plan.sh
 
+# Rebuild published images from scratch and check they're byte-identical (all when no name).
+repro name="":
+    hack/repro.sh {{ name }}
+
 # Build for every platform, push, sign and verify one image (CI only).
 publish name:
     hack/publish.sh {{ name }}

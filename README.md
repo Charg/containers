@@ -65,6 +65,7 @@ just lint                     # shellcheck, hadolint, actionlint, yamllint
 just check anki-sync-server   # build for the host, run its smoke test, scan it
 just build-all anki-sync-server  # cross-build every platform
 just plan                     # what the release workflow would publish
+just repro vaultwarden        # rebuild the published image from scratch and compare digests
 ```
 
 CI runs these same recipes.
@@ -94,6 +95,13 @@ rather than rebuilt.
 Builds take no mutable references: base images and the Dockerfile frontend are pinned by digest,
 and upstream source is fetched by commit (`ANKI_COMMIT`), not by tag. The build fails if the
 upstream release tag no longer points at that commit.
+
+Builds are reproducible. The BuildKit daemon is pinned by digest, every file is stamped with a
+fixed `SOURCE_DATE_EPOCH` (1980-01-01, so that's the images' creation date), and build-stage
+Debian packages come from the snapshot.debian.org date the builder image was made from. A weekly
+workflow rebuilds every published image from scratch on a fresh builder and fails unless each
+platform image comes out with the published digest. To check one yourself on an amd64 machine,
+check out the commit that published it and run `just repro <name>`.
 
 Renovate bumps upstream versions with their commits (e.g. `ANKI_VERSION` and `ANKI_COMMIT` from
 the ankitects/anki releases), base image digests, GitHub Actions and the flake lock, and

@@ -15,10 +15,15 @@ NAME="${1:?usage: build.sh <name> [--all]}"
 MODE="${2:-}"
 require_image "${NAME}"
 
-args=(--builder "${BUILDER}" --file "${IMAGES_DIR}/${NAME}/Dockerfile")
+args=(
+  --builder "${BUILDER}"
+  --file "${IMAGES_DIR}/${NAME}/Dockerfile"
+  --build-arg "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
+)
 
 case "${MODE}" in
-  "") args+=(--load --tag "$(local_tag "${NAME}")") ;;
+  # Same timestamps as a publish, so the local image's layers match the published ones.
+  "") args+=(--output "type=docker,rewrite-timestamp=true" --tag "$(local_tag "${NAME}")") ;;
   --all) args+=(--platform "${PLATFORMS}" --output type=cacheonly) ;;
   *)
     echo "unknown mode: ${MODE}" >&2

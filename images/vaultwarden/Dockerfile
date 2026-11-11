@@ -9,8 +9,9 @@
 #     nonroot user, with no shell: upstream's start.sh and curl-based healthcheck.sh are dropped,
 #     and the binary is the entrypoint. Kubernetes probes GET /alive directly.
 #   - Cross-compiled with Debian's gcc cross toolchain instead of tonistiigi/xx.
-#   - Hermetic: build-stage apt packages come from a fixed snapshot.debian.org timestamp, every
-#     crate is fetched against the checksums in Cargo.lock, and the compile runs with no network.
+#   - Hermetic: build-stage apt packages come from the snapshot.debian.org timestamp the builder
+#     image was made from, every crate is fetched against the checksums in Cargo.lock, and the
+#     compile runs with no network.
 #   - Listens on 8080, not 80, so it runs unprivileged.
 #
 # OpenSSL is linked dynamically against the runtime image's libssl3, not vendored, so OpenSSL
@@ -22,12 +23,6 @@
 # renovate: datasource=github-releases depName=dani-garcia/vaultwarden
 ARG VAULTWARDEN_VERSION=1.37.5
 ARG VAULTWARDEN_COMMIT=6ed6921cc2b0e03b4d74189574d2a5e71c512e97
-
-# snapshot.debian.org timestamp the build-stage apt packages (compilers, libssl-dev) are installed
-# from, so a rebuild gets the same toolchain. Build-stage only: the runtime libraries come from the
-# distroless image, whose digest Renovate bumps for security fixes. Move this forward by hand when
-# the builder image changes Debian release or the toolchain needs an update.
-ARG DEBIAN_SNAPSHOT=20261110T000000Z
 
 # The web vault (Bitwarden's web client, patched for Vaultwarden) is a prebuilt, platform-neutral
 # set of static files that upstream publishes and pins per release in docker/DockerSettings.yaml.
@@ -49,7 +44,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # download the extra components it lists (rustfmt, clippy) in /src.
 ENV RUSTUP_TOOLCHAIN=${RUST_VERSION}
 
-ARG DEBIAN_SNAPSHOT
 ARG TARGETARCH
 ARG BUILDARCH
 
@@ -86,9 +80,17 @@ if [ "${TARGETARCH}" = arm64 ]; then
   echo "export RUSTFLAGS_ARCH='-C link-arg=-Wl,--fix-cortex-a53-843419'" >>/cross-env
 fi
 echo "export CARGO_TARGET_${target_env}_RUSTFLAGS=\"\${RUSTFLAGS_CROSS:-} \${RUSTFLAGS_ARCH:-}\"" >>/cross-env
-apt-get update --snapshot "${DEBIAN_SNAPSHOT}"
+# Install from the Debian snapshot the builder image records it was made from, so a rebuild gets
+# the same compilers and headers, and they move only when Renovate bumps the builder's digest.
+# The image's own packages came from the live archive a little later, so allow apt to step one
+# back to the snapshot's version: libssl-dev for the target must match the host's exactly. Build
+# stage only; the runtime OpenSSL is the distroless image's.
+snapshot="$(sed -n '\|^# http://snapshot.debian.org/archive/debian/[0-9TZ]*$| { s|.*/||p; q }' \
+  /etc/apt/sources.list.d/debian.sources)"
+[ -n "${snapshot}" ] || { echo "builder image records no Debian snapshot" >&2; exit 1; }
+apt-get update --snapshot "${snapshot}"
 # shellcheck disable=SC2086 # word splitting of the package list is intended
-apt-get install --snapshot "${DEBIAN_SNAPSHOT}" -y --no-install-recommends ${packages}
+apt-get install --snapshot "${snapshot}" --allow-downgrades -y --no-install-recommends ${packages}
 rm -rf /var/lib/apt/lists/*
 rustup target add "${target}"
 EOF

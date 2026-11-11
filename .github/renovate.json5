@@ -86,6 +86,14 @@
       labels: ["dependencies", "moved-tag"],
     },
     {
+      // BuildKit writes and compresses the layers, so a new release can change image bytes, and
+      // it's part of every image's inputs (hack/tools.sh): a bump republishes every image. Patch
+      // releases merge on green; minor releases wait for a human, like a Rust bump.
+      matchDepNames: ["moby/buildkit"],
+      matchUpdateTypes: ["minor"],
+      automerge: false,
+    },
+    {
       // Majors still wait for a human.
       matchUpdateTypes: ["major"],
       automerge: false,
@@ -98,6 +106,16 @@
   //   ARG ANKI_VERSION=26.09.4
   //   ARG ANKI_COMMIT=c06370ff4d87cb48d825f90cc83e02b9a4e84ecd
   customManagers: [
+    {
+      // The BuildKit image in hack/tools.sh, tag and digest:
+      //   # renovate: datasource=docker depName=moby/buildkit
+      //   BUILDKIT_IMAGE="moby/buildkit:v0.34.2@sha256:..."
+      customType: "regex",
+      managerFilePatterns: ["/^hack/tools\\.sh$/"],
+      matchStrings: [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+[A-Z_]+=\"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\"",
+      ],
+    },
     {
       customType: "regex",
       managerFilePatterns: ["/^images/[^/]+/Dockerfile$/"],
