@@ -129,7 +129,8 @@ if [ "${want}" != "${RUST_VERSION}" ]; then
   echo "vaultwarden ${VAULTWARDEN_VERSION} wants Rust ${want}, builder has ${RUST_VERSION}; bump the rust image" >&2
   exit 1
 fi
-cargo fetch --locked --target "$(cat /rust-target)"
+# Build scripts and proc macros run on the build host, so fetch the host's crates too.
+cargo fetch --locked --target "$(cat /rust-target)" --target "$(rustc -vV | sed -n 's/^host: //p')"
 EOF
 
 # The compile has no network: nothing a build script does can pull in an unpinned input.
