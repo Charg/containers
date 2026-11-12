@@ -2,7 +2,8 @@
 #
 # Anki's self-hosted sync server. Adapted from upstream's docs/syncserver/Dockerfile.distroless:
 # same cargo install and runtime layout, but cross-compiled on the build host (no QEMU), run as
-# distroless' nonroot user, and with both base images pinned by digest.
+# distroless' nonroot user, with both base images pinned by digest, and with the patches in
+# patches/ applied (they make the build byte-reproducible).
 
 # The published tag is this version. Renovate bumps it from the ankitects/anki GitHub releases,
 # together with the commit the release tag points at. The source is fetched by that commit, not
@@ -20,6 +21,8 @@ ARG ANKI_VERSION
 ARG ANKI_COMMIT
 ARG TARGETARCH
 ARG BUILDARCH
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN <<EOF
 set -eu
@@ -57,9 +60,16 @@ rm -rf /var/lib/apt/lists/*
 rustup target add "$(cat /rust-target)"
 EOF
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/cargo-target,id=anki-sync-server-target-${TARGETARCH} <<EOF
+# The checkout carries rust-toolchain.toml; build with this image's Rust instead of letting rustup
+# fetch the pinned one (and its components) at build time.
+ENV RUSTUP_TOOLCHAIN=${RUST_VERSION}
+
+WORKDIR /src
+COPY patches/ /patches/
+
+# Fetch the source and every crate it needs. The FTL translations are submodules, pinned by commit
+# in the superproject; the build script embeds them.
+RUN <<EOF
 set -eu
 # Upstream can move a tag; the commit is what gets built. Refuse if they no longer agree. For an
 # annotated tag, the peeled ^{} line is the commit.
@@ -70,14 +80,34 @@ if [ "${tagged}" != "${ANKI_COMMIT}" ]; then
   echo "anki tag ${ANKI_VERSION} points at '${tagged}', expected ${ANKI_COMMIT}; refusing to build" >&2
   exit 1
 fi
+git init -q .
+git remote add origin https://github.com/ankitects/anki.git
+git fetch -q --depth 1 origin "${ANKI_COMMIT}"
+git checkout -q FETCH_HEAD
+git submodule update -q --init --depth 1 ftl/core-repo ftl/qt-repo
+# Local fixes, applied in order. A patch that no longer applies fails the build: drop it once
+# upstream has the fix.
+for patch in /patches/*.patch; do
+  git apply --verbose "${patch}"
+done
+rm -rf .git ftl/core-repo/.git ftl/qt-repo/.git
+# That config is for upstream's own build system (protoc from its download, outputs for the
+# desktop app); cargo install --git never reads it, so build the way upstream's syncserver docs do.
+rm .cargo/config.toml
+# Build scripts and proc macros run on the build host, so fetch its crates too.
+cargo fetch --locked --target "$(cat /rust-target)" --target "$(rustc -vV | sed -n 's/^host: //p')"
+EOF
+
+# Offline from here: everything the build reads is already in the image.
+RUN --network=none \
+    --mount=type=cache,target=/cargo-target,id=anki-sync-server-target-${TARGETARCH} <<EOF
+set -eu
 . /cross-env
 CARGO_TARGET_DIR=/cargo-target CARGO_PROFILE_RELEASE_STRIP=true \
-  cargo install --git https://github.com/ankitects/anki.git \
-    --rev "${ANKI_COMMIT}" \
+  cargo install --path rslib/sync \
     --target "$(cat /rust-target)" \
     --root /anki-server \
-    --locked \
-    anki-sync-server
+    --frozen
 # Data directory, owned by distroless' nonroot user so the server can write to it.
 mkdir -p /rootfs/anki_data
 EOF
