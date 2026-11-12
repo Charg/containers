@@ -10,6 +10,11 @@
   labels: ["dependencies"],
   configMigration: true,
 
+  // Keep in sync with the gh-actions-lock version used locally.
+  constraints: {
+    ghActionsLock: "v0.4.1",
+  },
+
   // Merge without review once CI is green (main's ruleset requires the `ci` check). Let each
   // upstream release age a few days first: upstream yanks or re-tags a bad release in that
   // window instead of it reaching ghcr.

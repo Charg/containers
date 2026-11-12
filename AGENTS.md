@@ -98,6 +98,12 @@ don't rely on QEMU, it's far too slow for source builds.
   not 404). CI passes `GITHUB_TOKEN` with `packages: read`.
 - This repo is public. No secrets, internal hostnames or private registry references in any file.
 
+## GitHub Actions
+
+- Pin every `uses:` to a full commit SHA with a version comment.
+- After adding or bumping an action, regenerate `.github/workflows/actions.lock` with
+  `gh actions-lock --no-narrow`. Without `--no-narrow` it rewrites SHA pins to tags.
+
 ## Commits
 
 Conventional commits, scoped by image: `feat(anki-sync-server): ...`, `ci: ...`, `chore: ...`.
