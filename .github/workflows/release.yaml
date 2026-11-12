@@ -87,6 +87,34 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: nix develop -c just publish "${IMAGE}"
 
+      # Seed the cache-mounts entries pull requests restore from (see ci.yaml), from this clean
+      # build. The image is already published, so a failure here doesn't fail the job.
+      - name: Export cache mounts
+        id: mounts
+        if: steps.publish.outputs.digest != ''
+        continue-on-error: true
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          nix develop -c just cache-mounts export "${IMAGE}" amd64 "${RUNNER_TEMP}/cache-mounts/amd64"
+          nix develop -c just cache-mounts export "${IMAGE}" arm64 "${RUNNER_TEMP}/cache-mounts/arm64"
+
+      - name: Save amd64 cache mounts
+        if: steps.mounts.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/cache-mounts/amd64
+          key: cache-mounts-${{ matrix.image }}-amd64-${{ hashFiles(format('images/{0}/**', matrix.image)) }}
+
+      - name: Save arm64 cache mounts
+        if: steps.mounts.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/cache-mounts/arm64
+          key: cache-mounts-${{ matrix.image }}-arm64-${{ hashFiles(format('images/{0}/**', matrix.image)) }}
+
       - name: Attest build provenance
         # Run even if the public-pull check failed: the image is already pushed and signed.
         if: always() && steps.publish.outputs.digest != ''

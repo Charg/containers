@@ -3,7 +3,8 @@
 #
 #   build.sh <name>         build for the host platform and load it as localhost/<name>:dev
 #   build.sh <name> --all   build every platform in $PLATFORMS without exporting (proves the
-#                           cross-builds compile; `just publish` is what pushes)
+#                           cross-builds compile; `just publish` is what pushes). CI sets
+#                           PLATFORMS to one platform per job to build them in parallel.
 #
 # CACHE=gha switches on the GitHub Actions layer cache (CI only).
 
@@ -32,7 +33,11 @@ case "${MODE}" in
 esac
 
 if [ "${CACHE:-}" = gha ]; then
-  args+=(--cache-from "type=gha,scope=${NAME}" --cache-to "type=gha,mode=max,scope=${NAME}")
+  if [ -n "${MODE}" ]; then
+    gha_cache_args "${NAME}" "${PLATFORMS}" args
+  else
+    gha_cache_args "${NAME}" "$(host_platform)" args
+  fi
 fi
 
 ensure_builder

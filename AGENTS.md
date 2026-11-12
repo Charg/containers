@@ -25,7 +25,8 @@ images/<name>/Dockerfile   upstream version in the first `ARG <NAME>_VERSION=` b
                            `ARG <NAME>_COMMIT=` right after; base images and `# syntax=` pinned by digest
 images/<name>/test.sh      smoke test: `test.sh <image>`, runs it and asserts it serves; exit non-zero on failure
 hack/                      the scripts behind every recipe; tools.sh holds the shared helpers
-.github/workflows/         ci.yaml (PRs: lint, check and cross-build changed images), release.yaml (main: plan, publish)
+.github/workflows/         ci.yaml (PRs: lint; per changed image, check on amd64 and cross-build arm64 in
+                           parallel), release.yaml (main: plan, publish)
 .github/renovate.json5     bumps upstream version ARGs, base-image digests, actions, flake.lock
 ```
 
@@ -45,6 +46,7 @@ just build-all <name>    # cross-build linux/amd64 and linux/arm64, no export
 just changed [base]      # images touched since base (hack/, flake, workflows = all)
 just plan                # which images need publishing (queries GHCR, fails closed)
 just publish <name>      # CI only: push, sign, verify, check public
+just cache-mounts <import|export> <name> <arch> <dir>   # CI only: BuildKit cache mounts <-> host dir
 just repro [name]        # rebuild published images from scratch, require identical digests (amd64)
 ```
 
@@ -73,6 +75,13 @@ Builds are reproducible: the same inputs give byte-identical platform images, an
   fails the build, so it gets dropped once upstream fixes the cause.
 - Anything that changes the bytes built from unchanged inputs (a new build flag in `publish.sh`)
   bumps `BUILD_SCHEME`, which republishes every image.
+
+CI caches two things in the Actions cache (free up to 10 GB per repo; past that the oldest entries
+are evicted, which only costs speed): BuildKit's layer cache, one scope per image and platform, and
+the contents of `RUN --mount=type=cache` mounts (cargo target dirs), which the layer cache doesn't
+carry. Pull requests restore cache mounts (`just cache-mounts`) so a change above a compile step
+recompiles only what changed; release.yaml saves them after a publish. Publish and repro builds
+never restore cache mounts: they compile from a fresh builder.
 
 Builders compile natively on the build host and cross-compile for the target (`--platform=$BUILDPLATFORM`);
 don't rely on QEMU, it's far too slow for source builds.

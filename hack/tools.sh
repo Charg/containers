@@ -74,6 +74,27 @@ ensure_builder() {
   create_builder "${BUILDER}"
 }
 
+# GitHub Actions layer-cache arguments for building image ${1} for the comma-separated platforms
+# ${2}, appended to the array named ${3}. Each platform has its own cache scope, so CI's parallel
+# single-platform builds don't overwrite each other's cache index, and a multi-platform publish
+# reads and refreshes every platform's scope. Blobs are shared between scopes, so this costs
+# little extra cache storage.
+gha_cache_args() {
+  local name="$1" platform scope
+  local -n cache_args_out="$3"
+  local -a cache_platforms
+  IFS=, read -ra cache_platforms <<<"$2"
+  for platform in "${cache_platforms[@]}"; do
+    scope="${name}-${platform//\//-}"
+    cache_args_out+=(--cache-from "type=gha,scope=${scope}" --cache-to "type=gha,mode=max,scope=${scope}")
+  done
+}
+
+# Platform of the docker daemon's host, e.g. linux/amd64: what a build without --platform targets.
+host_platform() {
+  docker version --format '{{.Server.Os}}/{{.Server.Arch}}'
+}
+
 # Images present in the repo, one name per line. Empty output is valid: every recipe must succeed
 # on a checkout with no images.
 list_images() {
