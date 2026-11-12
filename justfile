@@ -23,6 +23,10 @@ build name:
 build-all name:
     hack/build.sh {{ name }} --all
 
+# Copy an image's BuildKit cache mounts to (export) or from (import) a host directory (CI only).
+cache-mounts action name arch dir:
+    hack/cache-mounts.sh {{ action }} {{ name }} {{ arch }} {{ dir }}
+
 # Run the image's smoke test against the locally built image.
 test name:
     hack/test.sh {{ name }}

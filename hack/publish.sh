@@ -81,7 +81,7 @@ case "${existing}" in
       --output "type=registry,rewrite-timestamp=true"
     )
     if [ "${CACHE:-}" = gha ]; then
-      args+=(--cache-from "type=gha,scope=${NAME}" --cache-to "type=gha,mode=max,scope=${NAME}")
+      gha_cache_args "${NAME}" "${PLATFORMS}" args
     fi
 
     ensure_builder

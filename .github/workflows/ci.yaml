@@ -57,8 +57,10 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'main' }}
         run: nix develop -c just changed "origin/${BASE_REF}"
 
+  # One job per image and platform, so the arm64 cross-build runs alongside the amd64 build, test
+  # and scan instead of after it.
   check:
-    name: check ${{ matrix.image }}
+    name: check ${{ matrix.image }} (${{ matrix.platform.arch }})
     needs: changed
     if: needs.changed.outputs.images != '[]'
     runs-on: ubuntu-latest
@@ -66,6 +68,13 @@ jobs:
       fail-fast: false
       matrix:
         image: ${{ fromJSON(needs.changed.outputs.images) }}
+        platform:
+          # The runner's own platform: build, load, smoke-test and scan.
+          - arch: amd64
+            recipe: check
+          # Cross-compiled on the same kind of runner, as a publish does: proves it builds.
+          - arch: arm64
+            recipe: build-all
     env:
       CACHE: gha
     steps:
@@ -82,15 +91,39 @@ jobs:
       - name: Expose the Actions cache to buildx
         uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
 
-      - name: Build, test and scan
-        env:
-          IMAGE: ${{ matrix.image }}
-        run: nix develop -c just check "${IMAGE}"
+      # BuildKit cache mounts (the cargo target dir) aren't in the layer cache. Keep them in the
+      # Actions cache so a change above the compile step rebuilds only what changed. The key
+      # follows the image's inputs: an exact hit means nothing new to save. A pull request reads
+      # its own entries first, then main's, which release.yaml saves from clean publish builds.
+      - name: Restore cache mounts
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/cache-mounts
+          key: >-
+            cache-mounts-${{ matrix.image }}-${{ matrix.platform.arch }}-${{
+            hashFiles(format('images/{0}/**', matrix.image)) }}
+          restore-keys: |
+            cache-mounts-${{ matrix.image }}-${{ matrix.platform.arch }}-
 
-      - name: Build every platform
+      - name: Load cache mounts into the builder
         env:
           IMAGE: ${{ matrix.image }}
-        run: nix develop -c just build-all "${IMAGE}"
+          ARCH: ${{ matrix.platform.arch }}
+        run: nix develop -c just cache-mounts import "${IMAGE}" "${ARCH}" "${RUNNER_TEMP}/cache-mounts"
+
+      - name: Build (and on amd64 test and scan)
+        env:
+          IMAGE: ${{ matrix.image }}
+          RECIPE: ${{ matrix.platform.recipe }}
+          PLATFORMS: linux/${{ matrix.platform.arch }}
+        run: nix develop -c just "${RECIPE}" "${IMAGE}"
+
+      # actions/cache saves the directory when the job ends, if the key wasn't an exact hit.
+      - name: Save cache mounts from the builder
+        env:
+          IMAGE: ${{ matrix.image }}
+          ARCH: ${{ matrix.platform.arch }}
+        run: nix develop -c just cache-mounts export "${IMAGE}" "${ARCH}" "${RUNNER_TEMP}/cache-mounts"
 
   # Single required status for the branch ruleset: passes when every image check passed or
   # there was nothing to check.
