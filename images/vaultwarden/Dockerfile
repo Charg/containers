@@ -88,7 +88,9 @@ echo "export CARGO_TARGET_${target_env}_RUSTFLAGS=\"\${RUSTFLAGS_CROSS:-} \${RUS
 snapshot="$(sed -n '\|^# http://snapshot.debian.org/archive/debian/[0-9TZ]*$| { s|.*/||p; q }' \
   /etc/apt/sources.list.d/debian.sources)"
 [ -n "${snapshot}" ] || { echo "builder image records no Debian snapshot" >&2; exit 1; }
-apt-get update --snapshot "${snapshot}"
+# A snapshot's Release files expire a week after it was taken (Valid-Until); the snapshot is fixed
+# and its signatures are still checked, so ignore the expiry or the build breaks after a week.
+apt-get update --snapshot "${snapshot}" -o Acquire::Check-Valid-Until=false
 # shellcheck disable=SC2086 # word splitting of the package list is intended
 apt-get install --snapshot "${snapshot}" --allow-downgrades -y --no-install-recommends ${packages}
 rm -rf /var/lib/apt/lists/*
