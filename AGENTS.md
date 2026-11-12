@@ -68,6 +68,9 @@ Builds are reproducible: the same inputs give byte-identical platform images, an
   there with `rewrite-timestamp=true`.
 - Build-stage apt installs use `--snapshot` with the snapshot.debian.org timestamp the builder
   image records in `/etc/apt/sources.list.d/debian.sources`, never the live archive.
+- Where upstream's own build isn't deterministic, fix it with a patch in `images/<name>/patches/`,
+  applied with `git apply` before building (see anki-sync-server). A patch that stops applying
+  fails the build, so it gets dropped once upstream fixes the cause.
 - Anything that changes the bytes built from unchanged inputs (a new build flag in `publish.sh`)
   bumps `BUILD_SCHEME`, which republishes every image.
 
