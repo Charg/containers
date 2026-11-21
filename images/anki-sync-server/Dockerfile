@@ -15,7 +15,7 @@ ARG ANKI_COMMIT=c06370ff4d87cb48d825f90cc83e02b9a4e84ecd
 # Builder runs natively on the build host and cross-compiles for the target platform; compiling
 # Anki under QEMU emulation takes over an hour. Keep the Rust release in step with the
 # rust-toolchain.toml of the Anki tag being built.
-FROM --platform=$BUILDPLATFORM rust:1.99.1-trixie@sha256:8a4e90c7946b74626488b1446f712c0fe0ed1a596cbd3d871684bc9c5433ae07 AS builder
+FROM --platform=$BUILDPLATFORM rust:1.100.0-trixie@sha256:223cc32ddca8f3ee90c436dbc94b6b5f052ea7f9653c5201e9612f08ad7d21b8 AS builder
 
 ARG ANKI_VERSION
 ARG ANKI_COMMIT
