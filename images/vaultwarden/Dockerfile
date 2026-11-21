@@ -36,7 +36,7 @@ FROM --platform=linux/amd64 ${WEB_VAULT_IMAGE} AS vault
 
 # Builder runs natively on the build host and cross-compiles for the target platform. The Rust
 # release must match the rust-toolchain.toml of the Vaultwarden tag being built; the build checks.
-FROM --platform=$BUILDPLATFORM rust:1.99.1-trixie@sha256:8a4e90c7946b74626488b1446f712c0fe0ed1a596cbd3d871684bc9c5433ae07 AS builder
+FROM --platform=$BUILDPLATFORM rust:1.100.0-trixie@sha256:223cc32ddca8f3ee90c436dbc94b6b5f052ea7f9653c5201e9612f08ad7d21b8 AS builder
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
