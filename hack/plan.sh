@@ -13,6 +13,7 @@
 #
 # Prints a summary, and writes `images=<json array of names>` to $GITHUB_OUTPUT when set.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools curl jq

@@ -1,15 +1,29 @@
-# Container images: dev tasks. Every recipe assumes the nix toolchain is on PATH; run inside the
-# dev shell (`nix develop`) or invoke a recipe directly as `nix develop -c just <recipe>`.
+# containers: dev tasks. Every recipe assumes the nix toolchain is on PATH: run inside the
+# dev shell (`nix develop`, or direnv via .envrc), or one-shot as `nix develop -c just <recipe>`.
+# Recipes are one-line shims over scripts in hack/; CI calls the same recipes.
 
-set shell := ["bash", "-cu"]
+set shell := ["bash", "-euo", "pipefail", "-c"]
 
 # List available recipes.
 _default:
     @just --list --unsorted
 
-# Lint: shellcheck, hadolint, actionlint, yamllint.
+# Run every linter: what CI and the pre-commit hook run.
 lint:
     hack/lint.sh
+
+# Format nix files.
+fmt:
+    git ls-files -z -- '*.nix' | xargs -0 --no-run-if-empty nixfmt
+
+# Install the prek git hooks from .pre-commit-config.yaml (once per clone).
+install-hooks:
+    prek install
+
+# List the dev shell's packages and the versions flake.lock pins them to.
+versions:
+    @nix eval --raw ".#devShells.$(nix eval --impure --raw --expr builtins.currentSystem).default.nativeBuildInputs" \
+      --apply 'ps: builtins.concatStringsSep "" (map (p: "${p.pname or p.name} ${p.version or "-"}\n") ps)'
 
 # List images, one per line.
 images:

@@ -14,6 +14,7 @@
 #
 # Fails closed: a registry error, an inputs mismatch or a digest mismatch all fail the run.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker docker-buildx curl jq

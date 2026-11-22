@@ -3,6 +3,7 @@
 # so one login covers both. Credentials come from the environment, never from arguments, so they
 # can't leak into the process list or a workflow's command trace.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker

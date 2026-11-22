@@ -6,8 +6,11 @@ workflows:
     '.github/workflows/ci.yaml':
         - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+        - 'cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086'
         - 'crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487'
-        - 'determinatesystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa'
+    '.github/workflows/flake-lock-diff.yaml':
+        - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+        - 'cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086'
     '.github/workflows/release.yaml':
         - 'actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8'
         - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
@@ -40,6 +43,11 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
+    'cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086':
+        ref: 'v31.11.5'
+        commit: 'sha1-3dc140bfc76c49fbd4dd958429132e3746bcb086'
+        owner_id: 36824654
+        repo_id: 212301524
     'crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487':
         ref: 'v4.0.0'
         commit: 'sha1-04d248b84655b509d8c44dc1d6f990c879747487'

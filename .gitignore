@@ -1,19 +1,18 @@
 # OS / editor cruft
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
 *.swp
+*.swo
 *~
 
-# Local scratch / secrets
+# Local scratch: plans, tickets, throwaway output
 .scratch/
+
+# Local secrets / env
 .env
 .env.*
-
-# cosign / sigstore local artifacts
-*.sig
-*.pem
-cosign.key
 
 # nix
 result
@@ -21,9 +20,20 @@ result-*
 .direnv/
 
 # Personal Claude Code state
+# Personal preferences and auto-allow permissions
 .claude/settings.local.json
+# Process lock for background schedules
 .claude/scheduled_tasks.lock
+# Parallel agent workspaces (duplicate codebase clones)
 .claude/worktrees/
+# Auto-memory state and local conversation history
 .claude/memory/
 .claude/plans/
+# Local, per-developer project instructions
 CLAUDE.local.md
+.playwright-mcp/
+
+# cosign / sigstore local artifacts
+*.sig
+*.pem
+cosign.key

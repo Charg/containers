@@ -12,6 +12,7 @@
 # Actions with an OIDC token available (id-token: write), which cosign picks up ambiently. Only
 # publish what `just plan` says needs publishing: this overwrites the version tag.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker docker-buildx cosign trivy curl jq git

@@ -1,24 +1,72 @@
 # AGENTS.md
 
-Container images published to `ghcr.io/charg/containers/<name>`, signed keylessly with cosign. Sibling of
-the `Charg/charts` repo (Helm charts); this repo holds only images and shares its conventions.
+<!-- BEGIN TEMPLATE: managed by Charg/template through `copier update`. Edit it there, not here. -->
 
-## Ground rules
+## Toolchain
 
-- **The toolchain is the nix flake.** Run everything inside `nix develop`, or one-shot as
-  `nix develop -c just <recipe>`. Never install tools ad hoc or pin a tool version in a script
-  or workflow; bump tools with `nix flake update` (a `flake.lock` change).
-- **`just` is the only interface.** Each recipe is a one-line shim over a script in `hack/`.
-  CI calls the same recipes a developer runs locally. New behaviour goes in `hack/`, then gets
-  a recipe, then CI calls the recipe. No logic in workflow YAML beyond setup and secrets.
-- **`hack/` scripts** are bash, start with `source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"`
-  (which sets `set -euo pipefail` and holds the shared helpers), and must succeed on a checkout
-  with no images. Call buildx through the `buildx` helper, not `docker buildx`.
+- **The toolchain is the nix flake.** Run everything inside `nix develop` (direnv loads it through
+  `.envrc`), or one-shot as `nix develop -c just <recipe>`. Never install tools ad hoc or pin a tool
+  version in a script or workflow: add it to `flake.nix`, bump it with `nix flake update`.
+- **`just` is the only interface.** Recipes are one-line shims over scripts in `hack/`, and CI calls
+  the same recipes a developer runs locally. New behaviour goes in `hack/`, then gets a recipe, then
+  CI calls the recipe. No logic in workflow YAML beyond setup and secrets.
+- **`hack/` scripts** are bash and start with `source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"`,
+  which sets `set -euo pipefail` and holds the shared helpers (`log`, `die`, `require_tools`,
+  `repo_files`).
+- Run `just lint` before committing. The prek hook (`just install-hooks`) runs it on commit.
+- Plans, tickets and throwaway output go in `.scratch/` (gitignored).
+
+## GitHub Actions
+
+- Workflows start with `permissions: {}` and grant each job only what it needs. Check out with
+  `persist-credentials: false`.
+- Pin every `uses:` to a full commit SHA with a version comment.
+- After adding or bumping an action, regenerate `.github/workflows/actions.lock` with
+  `gh actions-lock --no-narrow`. Without `--no-narrow` it rewrites SHA pins to tags, which zizmor's
+  `unpinned-uses` audit rejects.
+- Renovate policy (release age, automerge, nix lock maintenance) comes from the shared preset in
+  `Charg/template` (`renovate/default.json5`). `.github/renovate.json5` holds only this repo's
+  additions.
+
+## Commits
+
+- Conventional commits: `feat:`, `fix:`, `chore:`, `ci:`, `docs:`, `refactor:`, `test:`,
+  optionally scoped (`feat(api): ...`).
+- Work on a branch and open a PR. PRs squash-merge. Don't commit to `main` directly.
+- Commit only when asked.
+
+## Container images
+
+- The docker CLI and buildx come from the flake and talk to the host's daemon.
+- `just lint` runs hadolint over every `Dockerfile` and `Containerfile` (`hack/lint.d/container-images.sh`).
+  Accept a finding for one line with a `# hadolint ignore=DLxxxx` comment and the reason, or for the
+  repo in `.hadolint.yaml`.
+- Pin base images by digest (`image:tag@sha256:...`). Renovate keeps the digests current and
+  merges digest-only bumps without the release-age wait: they are how base-image CVE fixes arrive.
+
+## Template
+
+- Shared files (flake, justfile, `hack/tools.sh`, `hack/lint.sh`, `hack/lint.d/`, lint configs, CI,
+  this section) come from `Charg/template`; the answers are in `.copier-answers.yml`, which is
+  never edited by hand. Pull template changes with `copier update` and resolve any conflicts it
+  leaves. Add a flavour with `copier update --data 'flavours=[...]'`, listing every flavour wanted.
+- Projects extend the shared files freely (packages in `flake.nix`, recipes, lint steps; a new lint
+  step can be its own script in `hack/lint.d/`);
+  `copier update` merges template changes around those edits.
+- Only the text between the TEMPLATE markers in this file belongs to the template. Project rules go
+  under `## Project
+
+Container images published to `ghcr.io/charg/containers/<name>`, signed keylessly with cosign.
+Sibling of the `Charg/charts` repo (Helm charts); this repo holds only images and shares its
+conventions.
+
+- `hack/` scripts must succeed on a checkout with no images. Call buildx through the `buildx`
+  helper in `hack/tools.sh`, not `docker buildx`.
 - **Fail closed when publishing.** Anything short of a definitive registry answer aborts the
   run rather than guessing. Only `just plan` decides what gets published.
-- Run `just lint` before committing.
+- Commits are scoped by image: `feat(anki-sync-server): ...`.
 
-## Layout
+### Layout
 
 ```
 images/<name>/Dockerfile   upstream version in the first `ARG <NAME>_VERSION=` before FROM, its commit in
@@ -34,10 +82,10 @@ The image name is the directory name. The published tags are the upstream versio
 (`anki-sync-server:26.09.4`, moves on rebuilds) and `<version>-<first 12 of image_inputs>`
 (immutable, never overwritten), never a repo-level SemVer.
 
-## Recipes
+### Recipes
 
 ```bash
-just lint                # shellcheck, hadolint, actionlint, yamllint
+just lint                # every linter (hack/lint.sh, hack/lint.d/)
 just build <name>        # host platform, loaded as localhost/<name>:dev
 just test <name>         # run images/<name>/test.sh against localhost/<name>:dev
 just scan <name>         # trivy on localhost/<name>:dev; fails on fixable HIGH/CRITICAL
@@ -50,7 +98,7 @@ just cache-mounts <import|export> <name> <arch> <dir>   # CI only: BuildKit cach
 just repro [name]        # rebuild published images from scratch, require identical digests (amd64)
 ```
 
-## How publishing works
+### How publishing works
 
 `plan.sh` publishes an image when `ghcr.io/charg/containers/<name>:<version>` is missing, or when the
 `dev.charg.containers.inputs` index annotation on it doesn't match `image_inputs` (a hash of
@@ -86,7 +134,7 @@ never restore cache mounts: they compile from a fresh builder.
 Builders compile natively on the build host and cross-compile for the target (`--platform=$BUILDPLATFORM`);
 don't rely on QEMU, it's far too slow for source builds.
 
-## Adding an image
+### Adding an image
 
 1. Create `images/<name>/` with a `Dockerfile` (prefer upstream's own) and an executable
    `test.sh`. Run as non-root; set OCI labels including `org.opencontainers.image.description`.
@@ -97,7 +145,7 @@ don't rely on QEMU, it's far too slow for source builds.
 3. Add a row to the image table in `README.md`.
 4. `just lint && just check <name> && just build-all <name>` must pass.
 
-## Gotchas
+### Gotchas
 
 - Images publish under `containers/` and charts (Charg/charts) under `charts/`, so an image and a
   chart can share a name. Never publish to `ghcr.io/charg/<name>` directly.
@@ -109,14 +157,3 @@ don't rely on QEMU, it's far too slow for source builds.
 - Anonymous `just plan` aborts for an image that has never been published (GHCR answers 403,
   not 404). CI passes `GITHUB_TOKEN` with `packages: read`.
 - This repo is public. No secrets, internal hostnames or private registry references in any file.
-
-## GitHub Actions
-
-- Pin every `uses:` to a full commit SHA with a version comment.
-- After adding or bumping an action, regenerate `.github/workflows/actions.lock` with
-  `gh actions-lock --no-narrow`. Without `--no-narrow` it rewrites SHA pins to tags.
-
-## Commits
-
-Conventional commits, scoped by image: `feat(anki-sync-server): ...`, `ci: ...`, `chore: ...`.
-Work on a branch and open a PR; don't commit to `main` directly.
