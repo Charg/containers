@@ -7,10 +7,6 @@
     "github>Charg/template//renovate/container-images.json5",
   ],
 
-  // Let each upstream release age 3 days rather than the preset's 7: upstream yanks or re-tags a
-  // bad release in that window instead of it reaching ghcr, and base-image fixes aren't held back.
-  minimumReleaseAge: "3 days",
-
   packageRules: [
     {
       // Builder toolchains move in step with the upstream source (rust-toolchain.toml), not on
