@@ -103,6 +103,10 @@ RUN --network=none \
     --mount=type=cache,target=/cargo-target,id=anki-sync-server-target-${TARGETARCH} <<EOF
 set -eu
 . /cross-env
+# anki_proto writes its descriptors for rslib to OUT_DIR/../../ unless DESCRIPTORS_BIN says otherwise
+# (upstream's .cargo/config.toml, removed above, sets it). Cargo's newer build-dir layout gives each
+# crate its own parent there, so rslib can't find them; pin one path both build scripts share.
+DESCRIPTORS_BIN=/cargo-target/anki_descriptors.bin \
 CARGO_TARGET_DIR=/cargo-target CARGO_PROFILE_RELEASE_STRIP=true \
   cargo install --path rslib/sync \
     --target "$(cat /rust-target)" \
