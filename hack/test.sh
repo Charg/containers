@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs images/<name>/test.sh against the image `just build <name>` loaded locally.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker curl

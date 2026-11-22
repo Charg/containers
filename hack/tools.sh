@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Shared shell setup sourced by every other script in hack/.
+# Shared shell setup sourced by every other script in hack/:
+#
+#   source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 #
 # Tool versions are not pinned here: the nix flake (flake.nix + flake.lock) is the single source
 # of truth, and every script expects to run inside its dev shell (`nix develop`, or
@@ -8,6 +10,37 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export REPO_ROOT
+
+# Progress message on stderr.
+log() {
+  printf '==> %s\n' "$*" >&2
+}
+
+# Print an error and exit non-zero.
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+# Fail unless every named tool is on PATH.
+require_tools() {
+  local missing=() tool
+  for tool in "$@"; do
+    command -v "${tool}" >/dev/null 2>&1 || missing+=("${tool}")
+  done
+  if ((${#missing[@]} > 0)); then
+    die "missing tools: ${missing[*]} (run inside the dev shell: nix develop)"
+  fi
+}
+
+# Files tracked or not yet added (but not ignored) that match the given pathspecs, NUL-separated.
+repo_files() {
+  git -C "${REPO_ROOT}" ls-files -z --cached --others --exclude-standard -- "$@"
+}
+
+# --- Container images (project helpers) ---
+
 IMAGES_DIR="${REPO_ROOT}/images"
 
 # BuildKit daemon every build runs in, pinned by digest: it writes the layer tarballs and
@@ -40,20 +73,6 @@ export INPUTS_ANNOTATION="dev.charg.containers.inputs"
 
 # GHCR rejects uppercase path segments; this repo's owner (Charg) has one.
 OWNER="$(printf '%s' "${GITHUB_REPOSITORY_OWNER:-Charg}" | tr '[:upper:]' '[:lower:]')"
-
-require_tools() {
-  local missing=0 tool
-  for tool in "$@"; do
-    command -v "${tool}" >/dev/null 2>&1 || {
-      echo "missing tool: ${tool}" >&2
-      missing=1
-    }
-  done
-  if [ "${missing}" -ne 0 ]; then
-    echo "enter the dev shell first: 'nix develop' (or run the recipe as 'nix develop -c just <recipe>')" >&2
-    return 1
-  fi
-}
 
 # The nix-provided buildx, called directly so a different docker CLI plugin on the host can't
 # shadow it.

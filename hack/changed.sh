@@ -4,6 +4,7 @@
 #
 # Prints one name per line, and writes `images=<json array>` to $GITHUB_OUTPUT when set.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools git jq

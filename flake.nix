@@ -1,5 +1,5 @@
 {
-  description = "Container images: development toolchain and CI environment";
+  description = "Container images built from upstream source, published to ghcr.io/charg/containers";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
@@ -18,25 +18,32 @@
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShellNoCC {
           packages = [
+            # Task runner and git hooks.
             pkgs.just
-            # Builds: the docker CLI talks to the host daemon; buildx drives a
-            # docker-container builder so multi-arch builds work the same everywhere.
+            pkgs.prek
+            # Lint (hack/lint.sh).
+            pkgs.actionlint
+            pkgs.nixfmt
+            pkgs.shellcheck
+            pkgs.yamllint
+            pkgs.zizmor
+            # container-images flavour: builds through the host's docker daemon with buildx, so
+            # multi-arch builds work the same everywhere; lint in hack/lint.d/container-images.sh.
             pkgs.docker-client
             pkgs.docker-buildx
+            pkgs.hadolint
+            # Used by the scripts directly.
+            pkgs.git
             # Scanning and signing.
             pkgs.trivy
             pkgs.cosign
-            # Lint.
-            pkgs.shellcheck
-            pkgs.hadolint
-            pkgs.actionlint
-            pkgs.yamllint
-            # Used by the scripts directly: registry probing and JSON assembly.
-            pkgs.git
+            # Registry probing and JSON assembly.
             pkgs.curl
             pkgs.jq
           ];
         };
       });
+
+      formatter = forAllSystems (pkgs: pkgs.nixfmt);
     };
 }

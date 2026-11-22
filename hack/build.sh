@@ -8,6 +8,7 @@
 #
 # CACHE=gha switches on the GitHub Actions layer cache (CI only).
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker docker-buildx

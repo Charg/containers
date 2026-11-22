@@ -2,6 +2,7 @@
 # Scans the locally built image with Trivy. Fails on HIGH/CRITICAL findings that have a fix
 # available; unfixed ones are reported but can't be acted on here.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker trivy

@@ -13,6 +13,7 @@
 # For CI on pull requests only: a published build starts from empty mounts on a fresh runner,
 # so nothing restored here can reach a published image.
 
+# shellcheck source=hack/tools.sh
 source "$(dirname "${BASH_SOURCE[0]}")/tools.sh"
 
 require_tools docker docker-buildx

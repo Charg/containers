@@ -1,0 +1,32 @@
+---
+# Git hooks, run with prek (https://github.com/j178/prek). Enable per clone with
+# `just install-hooks`; skip once with `git commit --no-verify`. The local hook expects the dev
+# shell on PATH (direnv, or commit from inside `nix develop`).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Patches applied with `git apply`: their whitespace is content.
+        exclude: \.patch$
+      - id: end-of-file-fixer
+        exclude: \.patch$
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/betterleaks/betterleaks
+    rev: v1.10.0
+    hooks:
+      - id: betterleaks
+
+  - repo: local
+    hooks:
+      # Same lint CI runs. It covers the whole repo, so it runs once per commit, not per file.
+      - id: lint
+        name: just lint
+        entry: just lint
+        language: system
+        pass_filenames: false
