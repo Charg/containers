@@ -47,7 +47,7 @@ IMAGES_DIR="${REPO_ROOT}/images"
 # compresses them, so a different BuildKit can produce different bytes from the same inputs.
 # Renovate bumps it (see .github/renovate.json5).
 # renovate: datasource=docker depName=moby/buildkit
-BUILDKIT_IMAGE="moby/buildkit:v0.35.0@sha256:aa632b921ef07411d2cb77292cd34213d4f7b384001d6fceef1e1f25bf9752bb"
+BUILDKIT_IMAGE="moby/buildkit:v0.35.1@sha256:baf6138eb8c37644800c7c913fba051e840ebb9ba13eaf92d92ef9a1712d0b4c"
 BUILDKIT_VERSION="${BUILDKIT_IMAGE#*:}"
 BUILDKIT_VERSION="${BUILDKIT_VERSION%@*}"
 
